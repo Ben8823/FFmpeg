@@ -383,22 +383,37 @@ static int ff_qsv_set_display_handle(AVCodecContext *avctx, QSVSession *qs)
 int ff_qsv_init_internal_session(AVCodecContext *avctx, QSVSession *qs,
                                  const char *load_plugins, int gpu_copy)
 {
-    mfxIMPL          impl = MFX_IMPL_AUTO_ANY;
     mfxVersion        ver = { { QSV_VERSION_MINOR, QSV_VERSION_MAJOR } };
-    mfxInitParam init_par = { MFX_IMPL_AUTO_ANY };
 
     const char *desc;
     int ret;
 
-#if QSV_VERSION_ATLEAST(1, 16)
-    init_par.GPUCopy        = gpu_copy;
-#endif
-    init_par.Implementation = impl;
-    init_par.Version        = ver;
-    ret = MFXInitEx(init_par, &qs->session);
+    // try d3d11
+    mfxIMPL impl = MFX_IMPL_HARDWARE_ANY | MFX_IMPL_VIA_D3D11;
+    ret = MFXInit(impl, &ver, qs);
+    if (ret >= 0)
+        av_log(avctx, AV_LOG_DEBUG, "MFX Initialized with HARDWARE_ANY | VIA_D3D11\n");
+
     if (ret < 0)
-        return ff_qsv_print_error(avctx, ret,
-                                  "Error initializing an internal MFX session");
+    {
+        // try d3d9
+        impl = MFX_IMPL_HARDWARE_ANY | MFX_IMPL_VIA_D3D9;
+        ret = MFXInit(impl, &ver, qs);
+        if(ret >= 0)
+            av_log(avctx, AV_LOG_DEBUG, "MFX Initialized with HARDWARE_ANY | VIA_D3D9\n");
+    }
+
+    // try any
+    if (ret < 0)
+    {
+        impl = MFX_IMPL_AUTO_ANY;
+        ret = MFXInit(impl, &ver, qs);
+        if(ret >= 0)
+            av_log(avctx, AV_LOG_DEBUG, "MFX Initialized with AUTO_ANY\n");
+    }
+
+    if (ret < 0)
+      return ff_qsv_print_error(avctx, ret, "Error initializing an internal MFX session");
 
 #ifdef AVCODEC_QSV_LINUX_SESSION_HANDLE
     ret = ff_qsv_set_display_handle(avctx, qs);
