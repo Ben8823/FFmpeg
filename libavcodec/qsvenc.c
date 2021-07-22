@@ -1369,6 +1369,11 @@ static int submit_frame(QSVEncContext *q, const AVFrame *frame,
         qf->surface.Data.PitchLow  = qf->frame->linesize[0];
         qf->surface.Data.Y         = qf->frame->data[0];
         qf->surface.Data.UV        = qf->frame->data[1];
+
+        if (q->param.mfx.CodecId == MFX_CODEC_VP9)
+        {
+          qf->surface.Data.V       = qf->frame->data[1];
+        }
     }
 
     qf->surface.Data.TimeStamp = av_rescale_q(frame->pts, q->avctx->time_base, (AVRational){1, 90000});
