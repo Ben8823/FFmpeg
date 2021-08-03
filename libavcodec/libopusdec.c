@@ -88,16 +88,6 @@ static av_cold int libopus_decode_init(AVCodecContext *avc)
         mapping    = mapping_arr;
     }
 
-    if (avc->channels > 2 && avc->channels <= 8) {
-        const uint8_t *vorbis_offset = ff_vorbis_channel_layout_offsets[avc->channels - 1];
-        int ch;
-
-        /* Remap channels from Vorbis order to ffmpeg order */
-        for (ch = 0; ch < avc->channels; ch++)
-            mapping_arr[ch] = mapping[vorbis_offset[ch]];
-        mapping = mapping_arr;
-    }
-
     opus->dec = opus_multistream_decoder_create(avc->sample_rate, avc->channels,
                                                 nb_streams, nb_coupled,
                                                 mapping, &ret);
