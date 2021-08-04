@@ -1027,7 +1027,7 @@ static av_cold int cuvid_decode_init(AVCodecContext *avctx)
     return 0;
 
 error:
-    cuvid_decode_end(avctx);
+    //cuvid_decode_end(avctx);
     return ret;
 }
 
