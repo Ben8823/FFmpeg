@@ -2536,6 +2536,9 @@ int ff_qsv_encode(AVCodecContext *avctx, QSVEncContext *q,
             av_freep(&enc_info);
             av_freep(&enc_buf);
         }
+        else {
+            ff_side_data_set_encoder_stats(&qpkt.pkt, 0, NULL, 0, pict_type);
+        }
         av_freep(&qpkt.bs);
         av_freep(&qpkt.sync);
 
