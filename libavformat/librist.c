@@ -77,6 +77,73 @@ static const AVOption librist_options[] = {
     { NULL }
 };
 
+struct ristreceiver_flow_cumulative_stats
+{
+    uint32_t flow_id;
+    uint64_t received;
+    uint64_t recovered;
+    uint64_t lost;
+    struct ristreceiver_flow_cumulative_stats *next;
+};
+
+struct ristsender_peer_cumulative_stats
+{
+    uint32_t peer_id;
+    uint64_t sent;
+    uint64_t retransmitted;
+    struct ristsender_peer_cumulative_stats *next;
+};
+
+struct ristreceiver_flow_cumulative_stats *stats_list_receiver = NULL;
+struct ristsender_peer_cumulative_stats   *stats_list_sender = NULL;
+
+static int cb_stats(void *arg, const struct rist_stats *stats_container)
+{
+    if (stats_container->stats_type == RIST_STATS_RECEIVER_FLOW)
+    {
+        struct ristreceiver_flow_cumulative_stats *stats = stats_list_receiver;
+        struct ristreceiver_flow_cumulative_stats **prev = &stats_list_receiver;
+        while (stats && stats->flow_id != stats_container->stats.receiver_flow.flow_id)
+        {
+            prev = &stats->next;
+            stats = stats->next;
+        }
+        if (!stats)
+        {
+            stats = calloc(sizeof(*stats), 1);
+            stats->flow_id = stats_container->stats.receiver_flow.flow_id;
+            *prev = stats;
+        }
+        stats->received += stats_container->stats.receiver_flow.received;
+        stats->lost += stats_container->stats.receiver_flow.lost;
+        stats->recovered += stats_container->stats.receiver_flow.recovered;
+        printf("{\"flow_cumulative_stats\":{\"flow_id\":%"PRIu32",\"received\":%"PRIu64",\"recovered\":%"PRIu64",\"lost\":%"PRIu64"},\"flow_json\": %s}\n", stats->flow_id, stats->received, stats->recovered, stats->lost, stats_container->stats_json);
+        fflush(stdout);
+    }
+    else if (stats_container->stats_type == RIST_STATS_SENDER_PEER)
+    {
+        struct ristsender_peer_cumulative_stats *stats = stats_list_sender;
+        struct ristsender_peer_cumulative_stats **prev = &stats_list_sender;
+        while (stats && stats->peer_id != stats_container->stats.sender_peer.peer_id)
+        {
+            prev = &stats->next;
+            stats = stats->next;
+        }
+        if (!stats)
+        {
+            stats = calloc(sizeof(*stats), 1);
+            stats->peer_id = stats_container->stats.sender_peer.peer_id;
+            *prev = stats;
+        }
+        stats->sent += stats_container->stats.sender_peer.sent;
+        stats->retransmitted += stats_container->stats.sender_peer.retransmitted;
+        printf("{\"peer_cumulative_stats\":{\"peer_id\":%"PRIu32",\"sent\":%"PRIu64",\"retransmitted\":%"PRIu64"},\"peer_json\": %s}\n", stats->peer_id, stats->sent, stats->retransmitted, stats_container->stats_json);
+        fflush(stdout);
+    }
+    rist_stats_free(stats_container);
+    return 0;
+}
+
 static int risterr2ret(int err)
 {
     switch (err) {
@@ -148,6 +215,10 @@ static int librist_open(URLContext *h, const char *uri, int flags)
     }
     if (ret < 0)
         goto err;
+
+    ret = rist_stats_callback_set(s->ctx, 1000, cb_stats, (void*)0);
+    if (ret < 0)
+        return risterr2ret(ret);
 
     ret = rist_peer_config_defaults_set(peer_config);
     if (ret < 0)
