@@ -3189,7 +3189,7 @@ static int mkv_init(struct AVFormatContext *s)
             break;
 #endif
         case AV_CODEC_ID_AV1:
-            track->reformat = mkv_reformat_av1;
+            track->reformat = NULL;
             break;
         case AV_CODEC_ID_WEBVTT:
             track->reformat = webm_reformat_vtt;
